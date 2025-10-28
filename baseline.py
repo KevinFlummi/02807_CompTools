@@ -4,8 +4,6 @@ import re
 import nltk
 import math
 import numpy as np
-import seaborn as sns
-import pandas as pd
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 from collections import defaultdict
@@ -28,17 +26,9 @@ stop_words = set(stopwords.words("english"))
 
 
 def build_word_stats(dataset):
-    """
-    dataset: PyTorch Dataset (e.g., train_ds)
-
-    Returns:
-    - word_stats: dict[word] = {'score': total_score, 'count': occurrences}
-    - total_score_sum: sum of all review scores in the dataset
-    """
     word_stats = defaultdict(lambda: {"score": 0.0, "count": 0})
     total_score_sum = 0.0
-    word_pattern = re.compile(r"\b\w+\b")  # matches words
-
+    word_pattern = re.compile(r"\b\w+\b")
     for text, rating in tqdm(dataset, desc="Processing reviews"):
         total_score_sum += rating
         # convert text to lowercase and split into words
@@ -75,11 +65,6 @@ def assign_sentiment(word_stats, total_score_sum, total_count):
 
 
 def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True):
-    """
-    Plots a histogram of word sentiment scores
-    word_stats: dict[word] with 'sentiment' key
-    bins: number of bins for the histogram
-    """
     # Extract all sentiment scores
     sentiments = [v["sentiment"] for v in word_stats.values()]
 
@@ -143,11 +128,6 @@ def plot_word_cloud(word_stats, top_words=100, savefig=True):
 def evaluate_word_sentiment_reconstruction(
     dataset, word_stats, global_mean, global_std, savefig=True, prefix=""
 ):
-    """
-    dataset: PyTorch Dataset (text, rating)
-    word_stats: dict[word] with 'sentiment' (z-score)
-    global_mean, global_std: from training set
-    """
     true_scores = []
     pred_scores = []
     n_unknown = 0
