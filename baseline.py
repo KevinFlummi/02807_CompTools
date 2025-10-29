@@ -187,3 +187,5 @@ if __name__ == "__main__":
         test_ds, word_stats, global_mean, global_std, prefix="AllBeauty_"
     )
     print("Number of unknown words:", unknown)
+
+    # MSE: 0.959 for test, 1.290 for AllBeauty
