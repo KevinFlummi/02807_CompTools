@@ -1,6 +1,11 @@
+import os
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from collections import defaultdict
+
+THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
 
 def mse_plot(scores, mse_values, counts, savepath=None):
@@ -51,7 +56,7 @@ def confusion_plot(true_scores, pred_scores, savepath=None):
         xticklabels=all_scores,
         yticklabels=all_scores,
         vmin=0,
-        vmax=50,
+        vmax=60,
     )
     plt.xlabel("Predicted Score (rounded)")
     plt.ylabel("True Score")
@@ -61,3 +66,41 @@ def confusion_plot(true_scores, pred_scores, savepath=None):
         plt.savefig(savepath)
     else:
         plt.show()
+
+
+def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
+    true_scores = np.array(true_scores)
+    pred_scores = np.array(pred_scores)
+
+    # Overall MSE (prediction is decimal, so diff < 0.5 would have been 'correct')
+    diff = np.abs(pred_scores - true_scores)
+    mse = np.mean(np.where(diff >= 0.5, diff**2, 0))
+    print(f"Overall MSE: {mse:.4f}")
+
+    # MSE per true rating
+    per_score_mse = defaultdict(list)
+    per_score_count = defaultdict(int)  # count of reviews per rating
+    for t, p in zip(true_scores, pred_scores):
+        per_score_mse[t].append((p - t) ** 2)
+        per_score_count[t] += 1
+
+    scores = sorted(per_score_mse.keys())
+    mse_values = [np.mean(per_score_mse[s]) for s in scores]
+    counts = [per_score_count[s] for s in scores]
+
+    mse_plot(
+        scores,
+        mse_values,
+        counts,
+        savepath=os.path.join(
+            THIS_PATH, "plots", prefix + "ErrorPerScore_" + suffix + ".png"
+        ),
+    )
+
+    confusion_plot(
+        true_scores,
+        pred_scores,
+        savepath=os.path.join(
+            THIS_PATH, "plots", prefix + "ConfusionMatrix_" + suffix + ".png"
+        ),
+    )

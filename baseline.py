@@ -14,7 +14,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
 )
 from data_loading import make_splits
-from analysis import mse_plot, confusion_plot
+from analysis import make_analysis
 
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -126,7 +126,7 @@ def plot_word_cloud(word_stats, top_words=100, savefig=True):
 
 
 def evaluate_word_sentiment_reconstruction(
-    dataset, word_stats, global_mean, global_std, savefig=True, prefix=""
+    dataset, word_stats, global_mean, global_std, prefix=""
 ):
     true_scores = []
     pred_scores = []
@@ -137,7 +137,7 @@ def evaluate_word_sentiment_reconstruction(
         word_sents = [
             word_stats[w]["sentiment"]
             for w in words
-            if w in word_stats and abs(word_stats[w]["sentiment"]) > 0.35
+            if w in word_stats and abs(word_stats[w]["sentiment"]) > 0.3
         ]
         avg_sent = np.mean(word_sents)
 
@@ -153,41 +153,7 @@ def evaluate_word_sentiment_reconstruction(
         true_scores.append(rating)
         pred_scores.append(pred)
 
-    true_scores = np.array(true_scores)
-    pred_scores = np.array(pred_scores)
-
-    # Overall MSE (prediction is decimal, so diff < 0.5 would have been 'correct')
-    diff = np.abs(pred_scores - true_scores)
-    mse = np.mean(np.where(diff >= 0.5, diff**2, 0))
-    print(f"Overall MSE: {mse:.4f}")
-
-    # MSE per true rating
-    per_score_mse = defaultdict(list)
-    per_score_count = defaultdict(int)  # count of reviews per rating
-    for t, p in zip(true_scores, pred_scores):
-        per_score_mse[t].append((p - t) ** 2)
-        per_score_count[t] += 1
-
-    scores = sorted(per_score_mse.keys())
-    mse_values = [np.mean(per_score_mse[s]) for s in scores]
-    counts = [per_score_count[s] for s in scores]
-
-    mse_plot(
-        scores,
-        mse_values,
-        counts,
-        savepath=os.path.join(
-            THIS_PATH, "plots", prefix + "ErrorPerScore_baseline.png"
-        ),
-    )
-
-    confusion_plot(
-        true_scores,
-        pred_scores,
-        savepath=os.path.join(
-            THIS_PATH, "plots", prefix + "ConfusionMatrix_baseline.png"
-        ),
-    )
+    make_analysis(true_scores, pred_scores, prefix=prefix, suffix="baseline")
 
     return n_unknown
 
