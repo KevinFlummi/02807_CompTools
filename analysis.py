@@ -3,6 +3,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import norm
 from collections import defaultdict
 
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -104,3 +105,20 @@ def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
             THIS_PATH, "plots", prefix + "ConfusionMatrix_" + suffix + ".png"
         ),
     )
+
+
+def plot_cluster_spread(stats, savepath=None):
+    plt.figure(figsize=(6, 5))
+    x = np.linspace(1, 5, 100)
+    for mean, std in stats:
+        y = norm.pdf(x, mean, std)
+        plt.plot(x, y, alpha=0.005, color="b")
+        plt.fill_between(x, y, alpha=0.01, color="b")
+    plt.xlabel("Score")
+    plt.ylabel("Frequency")
+    plt.title("Cluster score distribution")
+    plt.tight_layout()
+    if savepath:
+        plt.savefig(savepath)
+    else:
+        plt.show()

@@ -10,7 +10,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
 )
 from data_loading import make_splits
-from analysis import make_analysis
+from analysis import make_analysis, plot_cluster_spread
 
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -31,11 +31,15 @@ def transformer_kmeans_clustering(dataset, k=50):
     clusters = kmeans.fit_predict(embeddings)
 
     cluster_ratings = {}
+    cluster_stats = []
     for i in range(k):
+        cluster_stats.append(
+            (np.mean(ratings[clusters == i]), np.std(ratings[clusters == i]))
+        )
         cluster_ratings[i] = np.bincount(ratings[clusters == i].astype(int)).argmax()
         # cluster_ratings[i] = np.median(ratings[clusters == i])
         # tried mean, median and max, this one seems to be the best
-    return model, kmeans, cluster_ratings
+    return model, kmeans, cluster_ratings, cluster_stats
 
 
 def transformer_clustering_predict(dataset, model, kmeans, ratings, prefix="", x=15):
@@ -71,7 +75,13 @@ if __name__ == "__main__":
         os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
     )
 
-    model, kmeans, cluster_ratings = transformer_kmeans_clustering(train_ds, k=2000)
-    transformer_clustering_predict(test_ds, model, kmeans, cluster_ratings)
+    model, kmeans, cluster_ratings, stats = transformer_kmeans_clustering(
+        train_ds,
+        k=2000,
+    )
+    plot_cluster_spread(
+        stats, savepath=os.path.join(THIS_PATH, "plots", "Cluster_Distribution.png")
+    )
+    # transformer_clustering_predict(test_ds, model, kmeans, cluster_ratings)
 
     # MSE: 1.095 for test with k=20
