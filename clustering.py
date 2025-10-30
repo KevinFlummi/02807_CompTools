@@ -33,12 +33,16 @@ def transformer_kmeans_clustering(dataset, k=50):
     cluster_ratings = {}
     cluster_stats = []
     for i in range(k):
-        cluster_stats.append(
-            (np.mean(ratings[clusters == i]), np.std(ratings[clusters == i]))
-        )
+        # tried mean, median and max, this one seems to be the best
         cluster_ratings[i] = np.bincount(ratings[clusters == i].astype(int)).argmax()
         # cluster_ratings[i] = np.median(ratings[clusters == i])
-        # tried mean, median and max, this one seems to be the best
+        cluster_stats.append(
+            (
+                np.mean(ratings[clusters == i]),
+                np.std(ratings[clusters == i]),
+                cluster_ratings[i],
+            )
+        )
     return model, kmeans, cluster_ratings, cluster_stats
 
 

@@ -108,14 +108,16 @@ def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
 
 
 def plot_cluster_spread(stats, savepath=None):
-    plt.figure(figsize=(6, 5))
+    plt.figure(figsize=(8, 4))
     x = np.linspace(1, 5, 100)
-    for mean, std in stats:
+    colors = {1: "r", 2: "y", 3: "g", 4: "b", 5: "m"}
+    for mean, std, rating in stats:
         y = norm.pdf(x, mean, std)
-        plt.plot(x, y, alpha=0.005, color="b")
-        plt.fill_between(x, y, alpha=0.01, color="b")
+        plt.plot(x, y, alpha=0.005, color=colors[rating])
+        plt.fill_between(x, y, alpha=0.01, color=colors[rating])
     plt.xlabel("Score")
-    plt.ylabel("Frequency")
+    plt.ylabel("Certainty")
+    plt.yticks([])
     plt.title("Cluster score distribution")
     plt.tight_layout()
     if savepath:
