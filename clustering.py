@@ -1,16 +1,18 @@
 import os
 import sys
+import torch
 import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.preprocessing import normalize
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
 )
 from data_loading import make_splits
 from analysis import make_analysis, plot_cluster_spread
+from transformer import encode_texts, build_transformer, AutoTokenizer
 
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -19,10 +21,20 @@ def transformer_kmeans_clustering(dataset, k=50):
     texts = [text for text, _ in dataset]
     ratings = np.array([rating for _, rating in dataset])
 
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    embeddings = model.encode(
-        texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
-    ).astype(np.float64)
+    # Using pretrained sentence transformer
+    ############################################################################
+    # model = sentence_transformers.SentenceTransformer("all-MiniLM-L6-v2")
+    # embeddings = model.encode(
+    #    texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
+    # ).astype(np.float64)
+    ############################################################################
+    # Using self-trained sentence transformer
+    ############################################################################
+    model = build_transformer()
+    model.load_state_dict(torch.load("sentence_tranformer_weights.pth"))
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer/")
+    embeddings = encode_texts(model, tokenizer, texts)
+    ############################################################################
 
     # Normalize embeddings for spherical K-Means
     embeddings = normalize(embeddings, norm="l2", axis=1)
@@ -48,9 +60,17 @@ def transformer_kmeans_clustering(dataset, k=50):
 
 def transformer_clustering_predict(dataset, model, kmeans, ratings, prefix="", x=15):
     texts = [text for text, _ in dataset]
-    embeddings = model.encode(
-        texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
-    ).astype(np.float64)
+    # Using pretrained sentence transformer
+    ############################################################################
+    # embeddings = model.encode(
+    #    texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
+    # ).astype(np.float64)
+    ############################################################################
+    # Using self-trained sentence transformer
+    ############################################################################
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer/")
+    embeddings = encode_texts(model, tokenizer, texts)
+    ############################################################################
     embeddings = normalize(embeddings, norm="l2", axis=1)
 
     centers = normalize(kmeans.cluster_centers_, norm="l2", axis=1)
@@ -81,7 +101,7 @@ if __name__ == "__main__":
 
     model, kmeans, cluster_ratings, stats = transformer_kmeans_clustering(
         train_ds,
-        k=2000,
+        k=200,  # 200 was best with pretrained
     )
     plot_cluster_spread(
         stats, savepath=os.path.join(THIS_PATH, "plots", "Cluster_Distribution.png")
@@ -94,4 +114,5 @@ if __name__ == "__main__":
     transformer_clustering_predict(
         test_ds, model, kmeans, cluster_ratings, prefix="AllBeauty_"
     )
-    # MSE: 1.095 for test with k=20
+    # MSE: 1.095 for test with k=200
+    # Self-trained sentencetransformer: MSE 0.829 for train, 1.05 for test
