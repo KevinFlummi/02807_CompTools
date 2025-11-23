@@ -86,6 +86,12 @@ if __name__ == "__main__":
     plot_cluster_spread(
         stats, savepath=os.path.join(THIS_PATH, "plots", "Cluster_Distribution.png")
     )
-    # transformer_clustering_predict(test_ds, model, kmeans, cluster_ratings)
+    transformer_clustering_predict(test_ds, model, kmeans, cluster_ratings)
 
+    _, _, test_ds = make_splits(
+        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
+    )
+    transformer_clustering_predict(
+        test_ds, model, kmeans, cluster_ratings, prefix="AllBeauty_"
+    )
     # MSE: 1.095 for test with k=20
