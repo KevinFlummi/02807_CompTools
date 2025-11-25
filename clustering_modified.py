@@ -2,7 +2,13 @@ import os
 import sys
 import numpy as np
 from scipy.spatial.distance import cdist
-from sklearn.cluster import MiniBatchKMeans
+
+
+#### from sklearn.cluster import MiniBatchKMeans
+from NumpyClusteringImplementation import MyMiniBatchKMeans as MiniBatchKMeans
+
+
+
 from sklearn.preprocessing import normalize
 from sentence_transformers import SentenceTransformer
 
@@ -15,12 +21,15 @@ from analysis import make_analysis, plot_cluster_spread
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
 
-def transformer_kmeans_clustering(dataset, k=50):
+def transformer_kmeans_clustering(dataset, k=50, cache_suffix=""):
     texts = [text for text, _ in dataset]
     ratings = np.array([rating for _, rating in dataset])
 
     # Percorso dove salvare il file "cache"
-    cache_path = os.path.join(THIS_PATH, "embeddings_cache.npy")
+    cache_path = os.path.join(
+        THIS_PATH,
+        f"embeddings_cache_{cache_suffix}.npy"
+    )
 
     # Se il file esiste già, CARICALO (ci mette 1 secondo)
     if os.path.exists(cache_path):

@@ -27,10 +27,10 @@ stop_words = set(stopwords.words("english"))
 
 def build_word_stats(dataset):
     word_stats = defaultdict(lambda: {"score": 0.0, "count": 0})
-    total_score_sum = 0.0
+    # total_score_sum = 0.0
     word_pattern = re.compile(r"\b\w+\b")
     for text, rating in tqdm(dataset, desc="Processing reviews"):
-        total_score_sum += rating
+        # total_score_sum += rating
         # convert text to lowercase and split into words
         words = [x for x in word_pattern.findall(text.lower()) if x not in stop_words]
         for word in words:
@@ -41,9 +41,10 @@ def build_word_stats(dataset):
     for k, v in word_stats.items():
         word_stats[k]["avg"] = v["score"] / v["count"]
 
-    return word_stats, total_score_sum
+    return word_stats, # total_score_sum
 
 
+'''
 def assign_sentiment(word_stats, total_score_sum, total_count):
     global_mean = total_score_sum / total_count
     # Compute global standard deviation
@@ -62,9 +63,49 @@ def assign_sentiment(word_stats, total_score_sum, total_count):
     global_std = math.sqrt(sum_squared_diff / total_count)
 
     return word_stats, global_mean, global_std
+'''
 
 
-def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True):
+def assign_sentiment(word_stats, dataset):
+    """
+    Compute sentiment scores for each word using the global mean of ratings
+    and optional exponential scaling.
+
+    Args:
+        word_stats (dict): dict of word -> {"score": float, "count": int, "avg": float}
+        dataset (iterable): dataset yielding (text, rating) pairs
+
+    Returns:
+        word_stats (dict): updated with 'sentiment' key for each word
+        global_mean (float): mean rating across dataset
+        global_std (float): standard deviation of ratings
+    """
+    # Compute global mean and standard deviation
+    total_count = 0
+    total_score_sum = 0.0
+    sum_squared_diff = 0.0
+
+    for _, rating in tqdm(dataset, desc="Calculating global mean and std"):
+        total_score_sum += rating
+        total_count += 1
+
+    global_mean = total_score_sum / total_count
+
+    for _, rating in tqdm(dataset, desc="Calculating variance"):
+        sum_squared_diff += (rating - global_mean) ** 2
+
+    global_std = math.sqrt(sum_squared_diff / total_count)
+
+    # Compute sentiment for each word using precomputed avg
+    for stats in word_stats.values():
+        diff = stats["avg"] - global_mean
+        # Exponential scaling (keeps sign, exaggerates strong sentiment)
+        stats["sentiment"] = np.sign(diff) * diff**2
+
+    return word_stats, global_mean, global_std
+
+
+def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True, prefix=""):
     # Extract all sentiment scores
     sentiments = [v["sentiment"] for v in word_stats.values()]
 
@@ -76,13 +117,13 @@ def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True):
     plt.grid(axis="y", alpha=0.75)
     if savefig:
         plt.savefig(
-            os.path.join(THIS_PATH, "plots", "SentimentDistribution_baseline.png")
+            os.path.join(THIS_PATH, "plots", f"{prefix}_SentimentDistribution_baseline.png")
         )
     else:
         plt.show()
 
 
-def plot_word_cloud(word_stats, top_words=100, savefig=True):
+def plot_word_cloud(word_stats, top_words=100, savefig=True, prefix=""):
     # Word cloud of most frequent words
     # Create frequency dictionary for top words
     top_items = sorted(word_stats.items(), key=lambda x: x[1]["count"], reverse=True)[
@@ -120,7 +161,7 @@ def plot_word_cloud(word_stats, top_words=100, savefig=True):
     plt.axis("off")
     plt.title(f"Word Cloud of Top {top_words} Words (colored by avg score)")
     if savefig:
-        plt.savefig(os.path.join(THIS_PATH, "plots", "Wordcloud_baseline.png"))
+        plt.savefig(os.path.join(THIS_PATH, "plots", f"{prefix}_Wordcloud_baseline.png"))
     else:
         plt.show()
 
