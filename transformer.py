@@ -59,9 +59,9 @@ class MeanPooling(nn.Module):
         return summed / counted
 
 
-class BasicSentenceTransformer(nn.Module):
+class BasicSBERT(nn.Module):
     """
-    Very basic transformer model using just an encoder and mean pooling
+    Very basic transformer model based on SBERT using just an encoder and mean pooling
     """
 
     def __init__(self, encoder):
@@ -107,7 +107,7 @@ def build_transformer():
         intermediate_size=256,
     )
     encoder = AutoModel.from_config(config)
-    return BasicSentenceTransformer(encoder)
+    return BasicSBERT(encoder)
 
 
 def collate_batch(batch, tokenizer):
