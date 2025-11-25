@@ -3,9 +3,8 @@ import re
 import nltk
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import defaultdict
+from collections import defaultdict, Counter
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import Ridge, LogisticRegression
 from tqdm import tqdm
 from wordcloud import WordCloud
@@ -32,6 +31,194 @@ RATING_COLORS = {
     4: (144, 238, 144),  # lightgreen - Positive
     5: (0, 100, 0),      # darkgreen - Very positive
 }
+
+
+class TfidfVectorizer:
+    """
+    TF-IDF Vectorizer implemented from scratch.
+    Mimics scikit-learn's TfidfVectorizer interface.
+    """
+    
+    def __init__(
+        self,
+        max_features=None,
+        ngram_range=(1, 1),
+        min_df=1,
+        max_df=1.0,
+        lowercase=True,
+        strip_accents=None,
+    ):
+        """
+        Initialize TF-IDF Vectorizer.
+        
+        Args:
+            max_features: Maximum number of features to keep
+            ngram_range: Tuple (min_n, max_n) for n-gram range
+            min_df: Minimum document frequency (int or float)
+            max_df: Maximum document frequency (int or float)
+            lowercase: Convert to lowercase
+            strip_accents: Not used, kept for compatibility
+        """
+        self.max_features = max_features
+        self.ngram_range = ngram_range
+        self.min_df = min_df
+        self.max_df = max_df
+        self.lowercase = lowercase
+        
+        # Will be set during fit
+        self.vocabulary_ = None
+        self.idf_ = None
+        self.feature_names_ = None
+        
+    def _generate_ngrams(self, tokens):
+        """Generate n-grams from a list of tokens."""
+        ngrams = []
+        min_n, max_n = self.ngram_range
+        
+        for n in range(min_n, max_n + 1):
+            for i in range(len(tokens) - n + 1):
+                ngram = tuple(tokens[i:i + n])
+                ngrams.append(ngram)
+        
+        return ngrams
+    
+    def _tokenize(self, text):
+        """Tokenize text into words."""
+        if self.lowercase:
+            text = text.lower()
+        
+        # Extract words using regex
+        words = WORD_PATTERN.findall(text)
+        
+        # Filter stopwords and short words
+        tokens = [
+            w for w in words
+            if w not in stop_words and len(w) > 1 and w.isalpha()
+        ]
+        
+        return tokens
+    
+    def _build_vocabulary(self, documents):
+        """Build vocabulary from documents."""
+        # Count document frequencies for each n-gram
+        doc_freq = Counter()
+        n_docs = len(documents)
+        
+        for doc in documents:
+            tokens = self._tokenize(doc)
+            ngrams = self._generate_ngrams(tokens)
+            unique_ngrams = set(ngrams)
+            doc_freq.update(unique_ngrams)
+        
+        # Filter by min_df and max_df
+        min_doc_freq = self.min_df if isinstance(self.min_df, int) else int(self.min_df * n_docs)
+        max_doc_freq = self.max_df if isinstance(self.max_df, int) else int(self.max_df * n_docs)
+        
+        # Filter vocabulary
+        filtered_vocab = {
+            ngram: freq
+            for ngram, freq in doc_freq.items()
+            if min_doc_freq <= freq <= max_doc_freq
+        }
+        
+        # Select top features if max_features is specified
+        if self.max_features and len(filtered_vocab) > self.max_features:
+            # Sort by frequency (descending) and take top max_features
+            sorted_vocab = sorted(
+                filtered_vocab.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:self.max_features]
+            filtered_vocab = dict(sorted_vocab)
+        
+        # Create vocabulary mapping (ngram -> index)
+        sorted_ngrams = sorted(filtered_vocab.keys())
+        self.vocabulary_ = {ngram: idx for idx, ngram in enumerate(sorted_ngrams)}
+        self.feature_names_ = [self._ngram_to_string(ngram) for ngram in sorted_ngrams]
+        
+        # Calculate IDF for each term
+        self.idf_ = np.zeros(len(self.vocabulary_))
+        for ngram, idx in self.vocabulary_.items():
+            doc_freq_count = doc_freq[ngram]
+            # IDF = log((N + 1) / (df + 1)) + 1 (smooth IDF)
+            self.idf_[idx] = np.log((n_docs + 1) / (doc_freq_count + 1)) + 1
+    
+    def _ngram_to_string(self, ngram):
+        """Convert n-gram tuple to string representation."""
+        if isinstance(ngram, tuple):
+            return " ".join(ngram)
+        return ngram
+    
+    def _compute_tfidf(self, document):
+        """Compute TF-IDF vector for a single document."""
+        tokens = self._tokenize(document)
+        ngrams = self._generate_ngrams(tokens)
+        
+        # Count term frequencies
+        tf = Counter(ngrams)
+        total_terms = len(ngrams)
+        
+        # Initialize TF-IDF vector
+        tfidf_vector = np.zeros(len(self.vocabulary_))
+        
+        # Compute TF-IDF for each term in vocabulary
+        for ngram, count in tf.items():
+            if ngram in self.vocabulary_:
+                idx = self.vocabulary_[ngram]
+                # TF = count / total_terms
+                tf_value = count / total_terms if total_terms > 0 else 0
+                # TF-IDF = TF * IDF
+                tfidf_vector[idx] = tf_value * self.idf_[idx]
+        
+        return tfidf_vector
+    
+    def fit(self, raw_documents):
+        """
+        Learn vocabulary and IDF from training documents.
+        
+        Args:
+            raw_documents: List of raw text documents
+            
+        Returns:
+            self
+        """
+        self._build_vocabulary(raw_documents)
+        return self
+    
+    def transform(self, raw_documents):
+        """
+        Transform documents to TF-IDF matrix.
+        
+        Args:
+            raw_documents: List of raw text documents
+            
+        Returns:
+            numpy array of shape (n_documents, n_features)
+        """
+        if self.vocabulary_ is None:
+            raise ValueError("Vectorizer has not been fitted yet. Call fit() first.")
+        
+        n_docs = len(raw_documents)
+        n_features = len(self.vocabulary_)
+        tfidf_matrix = np.zeros((n_docs, n_features))
+        
+        for i, doc in enumerate(raw_documents):
+            tfidf_matrix[i] = self._compute_tfidf(doc)
+        
+        return tfidf_matrix
+    
+    def fit_transform(self, raw_documents):
+        """
+        Learn vocabulary and IDF, then transform documents.
+        
+        Args:
+            raw_documents: List of raw text documents
+            
+        Returns:
+            numpy array of shape (n_documents, n_features)
+        """
+        self.fit(raw_documents)
+        return self.transform(raw_documents)
 
 
 def preprocess_text(text):
