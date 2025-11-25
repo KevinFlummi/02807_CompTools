@@ -41,29 +41,7 @@ def build_word_stats(dataset):
     for k, v in word_stats.items():
         word_stats[k]["avg"] = v["score"] / v["count"]
 
-    return word_stats, # total_score_sum
-
-
-'''
-def assign_sentiment(word_stats, total_score_sum, total_count):
-    global_mean = total_score_sum / total_count
-    # Compute global standard deviation
-    sum_squared_diff = 0
-    for text, rating in tqdm(train_ds, desc="Adjusting for mean"):
-        sum_squared_diff += (rating - global_mean) ** 2
-    # Compute word sentiment z-scores in [-1, 1]
-    for word, stats in word_stats.items():
-        word_avg = stats["score"] / stats["count"]
-        diff = word_avg - global_mean
-        # Exponential scaling to make stronger sentiments more important
-        z = np.sign(diff) * diff**2
-
-        stats["sentiment"] = z
-
-    global_std = math.sqrt(sum_squared_diff / total_count)
-
-    return word_stats, global_mean, global_std
-'''
+    return (word_stats,)  # total_score_sum
 
 
 def assign_sentiment(word_stats, dataset):
@@ -117,7 +95,9 @@ def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True, prefix="
     plt.grid(axis="y", alpha=0.75)
     if savefig:
         plt.savefig(
-            os.path.join(THIS_PATH, "plots", f"{prefix}_SentimentDistribution_baseline.png")
+            os.path.join(
+                THIS_PATH, "plots", f"{prefix}_SentimentDistribution_baseline.png"
+            )
         )
     else:
         plt.show()
@@ -161,7 +141,9 @@ def plot_word_cloud(word_stats, top_words=100, savefig=True, prefix=""):
     plt.axis("off")
     plt.title(f"Word Cloud of Top {top_words} Words (colored by avg score)")
     if savefig:
-        plt.savefig(os.path.join(THIS_PATH, "plots", f"{prefix}_Wordcloud_baseline.png"))
+        plt.savefig(
+            os.path.join(THIS_PATH, "plots", f"{prefix}_Wordcloud_baseline.png")
+        )
     else:
         plt.show()
 
@@ -205,7 +187,7 @@ if __name__ == "__main__":
     )
     total_count = len(train_ds)
     word_stats, global_mean, global_std = assign_sentiment(
-        *build_word_stats(train_ds), total_count
+        *build_word_stats(train_ds), train_ds
     )
 
     print("Average review score:", global_mean)
