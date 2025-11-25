@@ -46,6 +46,7 @@ def transformer_kmeans_clustering(dataset, k=50):
     cluster_stats = []
     for i in range(k):
         # tried mean, median and max, this one seems to be the best
+        #select the ratings for each encoded vector in that particular cluster and choose the common one
         cluster_ratings[i] = np.bincount(ratings[clusters == i].astype(int)).argmax()
         # cluster_ratings[i] = np.median(ratings[clusters == i])
         cluster_stats.append(
@@ -108,11 +109,6 @@ if __name__ == "__main__":
     )
     transformer_clustering_predict(test_ds, model, kmeans, cluster_ratings)
 
-    _, _, test_ds = make_splits(
-        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
-    )
-    transformer_clustering_predict(
-        test_ds, model, kmeans, cluster_ratings, prefix="AllBeauty_"
-    )
-    # MSE: 1.095 for test with k=200
-    # Self-trained sentencetransformer: MSE 0.829 for train, 1.05 for test
+    # MSE: 1.095 for test with k=20
+
+    print("done")

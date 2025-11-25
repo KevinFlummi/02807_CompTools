@@ -7,8 +7,11 @@ from torch.utils.data import Dataset
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
 
-def filter_jsonl(input_path, output_path, max_per_rating=50000):
+def filter_jsonl(input_path, output_path):
+    # keys we want to keep
     keep_keys = {"rating", "title", "text"}
+
+    # dictionaries that keep the ratings counts to compare before and after filtering
     rating_counts_before = defaultdict(int)
     rating_counts_after = defaultdict(int)
 
@@ -24,6 +27,9 @@ def filter_jsonl(input_path, output_path, max_per_rating=50000):
                     rating_counts_before[rating] += 1
             except json.JSONDecodeError:
                 continue
+
+    max_per_rating = min(rating_counts_before.values())
+
 
     # Second pass: write filtered output with limit
     with (
@@ -68,24 +74,29 @@ class ReviewDataset(Dataset):
         self.path = path
         self.indices = indices
         self.offsets = []
-        with open(path, "r", encoding="utf-8") as f:
+        # Open file in binary mode to get exact byte offsets
+        with open(path, "rb") as f:
             pos = 0
             for line in f:
                 self.offsets.append(pos)
-                pos += len(line.encode("utf-8"))
+                pos += len(line)  # len(line) in bytes
+
+
 
     def __len__(self):
         return len(self.indices)
 
     def __getitem__(self, idx):
         file_idx = self.indices[idx]
-        with open(self.path, "r", encoding="utf-8") as f:
+        # Read the specific line using the correct byte offset
+        with open(self.path, "rb") as f:
             f.seek(self.offsets[file_idx])
-            line = f.readline()
-            data = json.loads(line)
+            line = f.readline().decode("utf-8")  # decode bytes to string
+            data = json.loads(line) 
         text = f"{data.get('title', '')}: {data.get('text', '')}"
         rating = float(data.get("rating", 0.0))
         return text, rating
+
 
 
 def make_splits(path, train_ratio=0.8, val_ratio=0.1, seed=42):
@@ -111,17 +122,22 @@ def make_splits(path, train_ratio=0.8, val_ratio=0.1, seed=42):
 
 if __name__ == "__main__":
     # filter data
-    # try:
-    #    filter_jsonl(os.path.join(THIS_PATH, "Handmade_Products.jsonl"), os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl"), 50000)
-    #    filter_jsonl(os.path.join(THIS_PATH, "All_Beauty.jsonl"), os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl"), 100000)
-    # except Exception:
-    #    pass
+
+    filter_jsonl(
+        os.path.join(THIS_PATH, "Handmade_Products.jsonl"), 
+        os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
+        )
+    filter_jsonl(
+        os.path.join(THIS_PATH, "All_Beauty.jsonl"), 
+        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
+        )
+
 
     # create datasets
-    # train_ds, val_ds, test_ds = make_splits(os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl"))
-    # print("Train size:", len(train_ds))
-    # print("Validation size:", len(val_ds))
-    # print("Test size:", len(test_ds))
-    # print("First training sample:", train_ds[0])
+    train_ds, val_ds, test_ds = make_splits(os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl"))
+    print("Train size:", len(train_ds))
+    print("Validation size:", len(val_ds))
+    print("Test size:", len(test_ds))
+    print("First training sample:", train_ds[0])
 
     print("Done.")
