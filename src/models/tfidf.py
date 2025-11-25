@@ -10,13 +10,16 @@ from sklearn.linear_model import Ridge, LogisticRegression
 from tqdm import tqdm
 from wordcloud import WordCloud
 
-from data_loading import make_splits
-from analysis import make_analysis
+# Add project root to path for imports
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+import sys
+sys.path.insert(0, PROJECT_ROOT)
 
-THIS_PATH = os.path.dirname(os.path.realpath(__file__))
+from src.utils.data_loading import make_splits
+from src.utils.analysis import make_analysis
 
 # Download stopwords to ./nltk_data
-nltk.download("stopwords")
+nltk.download("stopwords", quiet=True)
 # Load stopwords
 stop_words = set(stopwords.words("english"))
 
@@ -146,6 +149,9 @@ def generate_rating_wordclouds(dataset, prefix="", top_words=100):
             ]
             rating_texts[rating].extend(words)
     
+    plots_dir = os.path.join(PROJECT_ROOT, "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+    
     print("\nGenerating word clouds for each rating...")
     for rating in sorted(rating_texts.keys()):
         words = rating_texts[rating]
@@ -171,7 +177,7 @@ def generate_rating_wordclouds(dataset, prefix="", top_words=100):
         )
         
         filename = f"{prefix}Wordcloud_Rating{rating}_tfidf.png"
-        savepath = os.path.join(THIS_PATH, "plots", filename)
+        savepath = os.path.join(plots_dir, filename)
         plt.savefig(savepath, dpi=150, bbox_inches="tight")
         plt.close()
         
@@ -200,7 +206,7 @@ def generate_rating_wordclouds(dataset, prefix="", top_words=100):
     plt.tight_layout()
     
     filename = f"{prefix}Wordcloud_Comparison_tfidf.png"
-    savepath = os.path.join(THIS_PATH, "plots", filename)
+    savepath = os.path.join(plots_dir, filename)
     plt.savefig(savepath, dpi=150, bbox_inches="tight")
     plt.close()
     
@@ -208,9 +214,8 @@ def generate_rating_wordclouds(dataset, prefix="", top_words=100):
 
 
 if __name__ == "__main__":
-    # Load data
     train_ds, val_ds, test_ds = make_splits(
-        os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl")
     )
     
     print("=" * 60)
@@ -229,16 +234,14 @@ if __name__ == "__main__":
     )
     predict_tfidf(test_ds, vectorizer_log, model_log, "logistic")
     
-    # Test on AllBeauty dataset
     print("\n" + "=" * 60)
     print("Testing on AllBeauty dataset (Ridge)")
     print("=" * 60)
     _, _, test_ds_allbeauty = make_splits(
-        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty_f.jsonl")
     )
     predict_tfidf(test_ds_allbeauty, vectorizer_ridge, model_ridge, "ridge", prefix="AllBeauty_")
     
-    # Generate word clouds for each rating community
     print("\n" + "=" * 60)
     print("Generating Word Clouds by Rating Community")
     print("=" * 60)

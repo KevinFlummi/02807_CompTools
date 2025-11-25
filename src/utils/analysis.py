@@ -6,11 +6,10 @@ import numpy as np
 from scipy.stats import norm
 from collections import defaultdict
 
-THIS_PATH = os.path.dirname(os.path.realpath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 
 def mse_plot(scores, mse_values, counts, savepath=None):
-    # Plot per-score MSE with counts
     plt.figure(figsize=(8, 5))
     bars = plt.bar(scores, mse_values, width=0.4, color="skyblue", edgecolor="black")
     plt.xlabel("True Review Score")
@@ -18,7 +17,6 @@ def mse_plot(scores, mse_values, counts, savepath=None):
     plt.title("Word-Sentiment Reconstruction Error per Score")
     plt.grid(axis="y", alpha=0.7)
 
-    # Annotate bar with count
     for bar, count in zip(bars, counts):
         height = bar.get_height()
         plt.text(
@@ -36,17 +34,14 @@ def mse_plot(scores, mse_values, counts, savepath=None):
 
 
 def confusion_plot(true_scores, pred_scores, savepath=None):
-    # Build confusion matrix (true vs predicted)
     all_scores = sorted(set([int(x) for x in true_scores]))
     confusion = pd.DataFrame(0, index=all_scores, columns=all_scores)
 
     for t, p in zip(true_scores, pred_scores):
         confusion.loc[t, round(p, 0)] += 1
 
-    # Convert counts to percentages per true score
     confusion_percent = confusion.div(confusion.sum(axis=1), axis=0) * 100
 
-    # Plot full matrix
     plt.figure(figsize=(6, 5))
     sns.heatmap(
         confusion_percent,
@@ -73,14 +68,12 @@ def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
     true_scores = np.array(true_scores)
     pred_scores = np.array(pred_scores)
 
-    # Overall MSE (prediction is decimal, so diff < 0.5 would have been 'correct')
     diff = np.abs(pred_scores - true_scores)
     mse = np.mean(np.where(diff >= 0.5, diff**2, 0))
     print(f"Overall MSE: {mse:.4f}")
 
-    # MSE per true rating
     per_score_mse = defaultdict(list)
-    per_score_count = defaultdict(int)  # count of reviews per rating
+    per_score_count = defaultdict(int)
     for t, p in zip(true_scores, pred_scores):
         per_score_mse[t].append((p - t) ** 2)
         per_score_count[t] += 1
@@ -89,12 +82,15 @@ def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
     mse_values = [np.mean(per_score_mse[s]) for s in scores]
     counts = [per_score_count[s] for s in scores]
 
+    plots_dir = os.path.join(PROJECT_ROOT, "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+    
     mse_plot(
         scores,
         mse_values,
         counts,
         savepath=os.path.join(
-            THIS_PATH, "plots", prefix + "ErrorPerScore_" + suffix + ".png"
+            plots_dir, prefix + "ErrorPerScore_" + suffix + ".png"
         ),
     )
 
@@ -102,7 +98,7 @@ def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
         true_scores,
         pred_scores,
         savepath=os.path.join(
-            THIS_PATH, "plots", prefix + "ConfusionMatrix_" + suffix + ".png"
+            plots_dir, prefix + "ConfusionMatrix_" + suffix + ".png"
         ),
     )
 
@@ -124,3 +120,4 @@ def plot_cluster_spread(stats, savepath=None):
         plt.savefig(savepath)
     else:
         plt.show()
+

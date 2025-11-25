@@ -106,3 +106,31 @@ venv.bak/
 .DS_Store
 
 *.ipynb
+
+# Cache files
+cache/*.npy
+cache/*.pkl
+cache/*.cache
+embeddings_cache*.npy
+lsh_signatures.npy
+lsh_ratings.npy
+
+# Generated plots (uncomment if you want to ignore all plots)
+# plots/*.png
+# plots/**/*.png
+
+# Model weights and checkpoints
+*.pth
+*.pt
+*.h5
+*.ckpt
+
+# NLTK data (downloaded automatically)
+nltk_data/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
