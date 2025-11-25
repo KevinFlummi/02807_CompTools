@@ -128,21 +128,69 @@ if __name__ == "__main__":
     train_ds, val_ds, test_ds = make_splits(
         os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
     )
-    minhash = MinHash(num_hashes=180)
-    lsh = LSHIndex(num_hashes=180, bands=60)
-    for text, rating in tqdm(train_ds, desc="Building LSH"):
-        shingles = get_shingles(text)
-        sig = minhash.signature(shingles)
-        lsh.add(sig, rating)
+    
+    # Parametri LSH
+    NUM_HASHES = 180
+    BANDS = 60
+    
+    minhash = MinHash(num_hashes=NUM_HASHES)
+    lsh = LSHIndex(num_hashes=NUM_HASHES, bands=BANDS)
 
+    # --- INIZIO CACHING ---
+    cache_sig_path = os.path.join(THIS_PATH, "lsh_signatures.npy")
+    cache_rat_path = os.path.join(THIS_PATH, "lsh_ratings.npy")
+    
+    signatures_data = None
+    ratings_data = None
+    
+    # 1. Controlliamo se esistono i file cache
+    if os.path.exists(cache_sig_path) and os.path.exists(cache_rat_path):
+        print(f"Trovata cache! Caricamento firme da {cache_sig_path}...")
+        try:
+            signatures_data = np.load(cache_sig_path)
+            ratings_data = np.load(cache_rat_path)
+            print(f"Caricate {len(signatures_data)} firme dalla cache.")
+        except Exception as e:
+            print(f"Errore caricamento cache: {e}. Ricalcolo...")
+
+    # 2. Se non abbiamo caricato (o fallito), calcoliamo da zero
+    if signatures_data is None:
+        print("Calcolo firme LSH in corso (sarà lento la prima volta)...")
+        sig_list = []
+        rat_list = []
+        
+        for text, rating in tqdm(train_ds, desc="Hashing"):
+            shingles = get_shingles(text)
+            # Gestione casi vuoti (importante per non disallineare gli array)
+            if not shingles: 
+                continue 
+                
+            sig = minhash.signature(shingles)
+            sig_list.append(sig)
+            rat_list.append(rating)
+        
+        signatures_data = np.array(sig_list)
+        ratings_data = np.array(rat_list)
+        
+        print("Salvataggio cache...")
+        np.save(cache_sig_path, signatures_data)
+        np.save(cache_rat_path, ratings_data)
+
+    # 3. Popolamento Indice (Veloce)
+    # L'indice va ricostruito in RAM ogni volta, ma con i dati pronti è veloce
+    print("Costruzione indice LSH...")
+    num_items = len(signatures_data)
+    for i in tqdm(range(num_items), desc="Populating Index"):
+        lsh.add(signatures_data[i], ratings_data[i])
+    # --- FINE CACHING ---
+
+    # Ora eseguiamo i test come prima
     unknown = estimate_ratings(test_ds, lsh, minhash)
     print("Number of unknown scores:", unknown, "out of", len(test_ds))
 
-    # Also test the word stat map on a fresh dataset to see if it is (somewhat) universal
-    _, _, test_ds = make_splits(
+    # Test su All_Beauty (Qui non usiamo cache perché è un test rapido sul test set)
+    _, _, test_ds_beauty = make_splits(
         os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
     )
-    unknown = estimate_ratings(test_ds, lsh, minhash, prefix="AllBeauty_")
-    print("Number of unknown scores:", unknown, "out of", len(test_ds))
-
-    # MSE: 1.130 for test
+    unknown = estimate_ratings(test_ds_beauty, lsh, minhash, prefix="AllBeauty_")
+    print("Number of unknown scores:", unknown, "out of", len(test_ds_beauty))
