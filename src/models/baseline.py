@@ -10,28 +10,23 @@ from collections import defaultdict
 from nltk.corpus import stopwords
 from tqdm import tqdm
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
-)
-from data_loading import make_splits
-from analysis import make_analysis
+# Add project root to path for imports
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
 
-THIS_PATH = os.path.dirname(os.path.realpath(__file__))
-
+from src.utils.data_loading import make_splits
+from src.utils.analysis import make_analysis
 
 # Download stopwords to ./nltk_data
-nltk.download("stopwords")
+nltk.download("stopwords", quiet=True)
 # Load stopwords
 stop_words = set(stopwords.words("english"))
 
 
 def build_word_stats(dataset):
     word_stats = defaultdict(lambda: {"score": 0.0, "count": 0})
-    # total_score_sum = 0.0
     word_pattern = re.compile(r"\b\w+\b")
     for text, rating in tqdm(dataset, desc="Processing reviews"):
-        # total_score_sum += rating
-        # convert text to lowercase and split into words
         words = [x for x in word_pattern.findall(text.lower()) if x not in stop_words]
         for word in words:
             if len(word) > 1 and word.isalpha():
@@ -41,24 +36,14 @@ def build_word_stats(dataset):
     for k, v in word_stats.items():
         word_stats[k]["avg"] = v["score"] / v["count"]
 
-    return (word_stats,)  # total_score_sum
+    return word_stats,
 
 
 def assign_sentiment(word_stats, dataset):
     """
     Compute sentiment scores for each word using the global mean of ratings
     and optional exponential scaling.
-
-    Args:
-        word_stats (dict): dict of word -> {"score": float, "count": int, "avg": float}
-        dataset (iterable): dataset yielding (text, rating) pairs
-
-    Returns:
-        word_stats (dict): updated with 'sentiment' key for each word
-        global_mean (float): mean rating across dataset
-        global_std (float): standard deviation of ratings
     """
-    # Compute global mean and standard deviation
     total_count = 0
     total_score_sum = 0.0
     sum_squared_diff = 0.0
@@ -74,17 +59,14 @@ def assign_sentiment(word_stats, dataset):
 
     global_std = math.sqrt(sum_squared_diff / total_count)
 
-    # Compute sentiment for each word using precomputed avg
     for stats in word_stats.values():
         diff = stats["avg"] - global_mean
-        # Exponential scaling (keeps sign, exaggerates strong sentiment)
         stats["sentiment"] = np.sign(diff) * diff**2
 
     return word_stats, global_mean, global_std
 
 
 def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True, prefix=""):
-    # Extract all sentiment scores
     sentiments = [v["sentiment"] for v in word_stats.values()]
 
     plt.figure(figsize=(8, 5))
@@ -93,37 +75,33 @@ def plot_word_sentiment_distribution(word_stats, bins=50, savefig=True, prefix="
     plt.xlabel("Sentiment Score")
     plt.ylabel("Number of Words")
     plt.grid(axis="y", alpha=0.75)
+    
+    plots_dir = os.path.join(PROJECT_ROOT, "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+    
     if savefig:
         plt.savefig(
-            os.path.join(
-                THIS_PATH, "plots", f"{prefix}_SentimentDistribution_baseline.png"
-            )
+            os.path.join(plots_dir, f"{prefix}_SentimentDistribution_baseline.png")
         )
     else:
         plt.show()
 
 
 def plot_word_cloud(word_stats, top_words=100, savefig=True, prefix=""):
-    # Word cloud of most frequent words
-    # Create frequency dictionary for top words
     top_items = sorted(word_stats.items(), key=lambda x: x[1]["count"], reverse=True)[
         :top_words
     ]
     freq_dict = {k: v["count"] for k, v in top_items}
 
-    # Normalize average scores to [0,1] for color mapping
     min_score = 1.0
     max_score = 5.0
     word_avg_scores = {
         k: min(max(v["avg"], min_score), max_score) for k, v in top_items
     }
 
-    # Custom color function
     def color_func(word, **kwargs):
-        score = word_avg_scores.get(word, 3.0)  # fallback to neutral
-        # Map 1.0 (blue) to 5.0 (green)
-        norm_score = (score - min_score) / (max_score - min_score)  # 0..1
-        # Interpolate between blue and green
+        score = word_avg_scores.get(word, 3.0)
+        norm_score = (score - min_score) / (max_score - min_score)
         r = int(255 * (1 - norm_score))
         g = int(255 * norm_score)
         b = 0
@@ -140,10 +118,12 @@ def plot_word_cloud(word_stats, top_words=100, savefig=True, prefix=""):
     )
     plt.axis("off")
     plt.title(f"Word Cloud of Top {top_words} Words (colored by avg score)")
+    
+    plots_dir = os.path.join(PROJECT_ROOT, "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+    
     if savefig:
-        plt.savefig(
-            os.path.join(THIS_PATH, "plots", f"{prefix}_Wordcloud_baseline.png")
-        )
+        plt.savefig(os.path.join(plots_dir, f"{prefix}_Wordcloud_baseline.png"))
     else:
         plt.show()
 
@@ -162,13 +142,12 @@ def evaluate_word_sentiment_reconstruction(
             for w in words
             if w in word_stats and abs(word_stats[w]["sentiment"]) > 0.3
         ]
-        avg_sent = np.mean(word_sents)
 
         if word_sents:
             avg_sent = np.mean(word_sents)
             pred = global_mean + avg_sent * global_std
         else:
-            pred = global_mean  # fallback for unknown words
+            pred = global_mean
             n_unknown += len([w for w in words if w not in word_stats])
 
         pred = max(1.0, min(5.0, pred))
@@ -183,7 +162,7 @@ def evaluate_word_sentiment_reconstruction(
 
 if __name__ == "__main__":
     train_ds, _, test_ds = make_splits(
-        os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl")
     )
     total_count = len(train_ds)
     word_stats, global_mean, global_std = assign_sentiment(
@@ -202,13 +181,11 @@ if __name__ == "__main__":
     )
     print("Number of unknown words:", unknown)
 
-    # Also test the word stat map on a fresh dataset to see if it is (somewhat) universal
     _, _, test_ds = make_splits(
-        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty_f.jsonl")
     )
     unknown = evaluate_word_sentiment_reconstruction(
         test_ds, word_stats, global_mean, global_std, prefix="AllBeauty_"
     )
     print("Number of unknown words:", unknown)
 
-    # MSE: 0.959 for test, 1.290 for AllBeauty

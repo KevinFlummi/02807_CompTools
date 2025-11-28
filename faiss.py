@@ -6,12 +6,13 @@ from tqdm import tqdm
 from sklearn.preprocessing import normalize
 from transformers import AutoTokenizer
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
-)
-from data_loading import make_splits
-from analysis import make_analysis
-from transformer import build_transformer, encode_texts
+# Add project root to path
+PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, PROJECT_ROOT)
+
+from src.utils.data_loading import make_splits
+from src.utils.analysis import make_analysis
+from src.models.transformer import build_transformer, encode_texts
 
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 

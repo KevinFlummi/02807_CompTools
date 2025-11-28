@@ -8,16 +8,15 @@ from collections import defaultdict
 from tqdm import tqdm
 from nltk.corpus import stopwords
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
-)
-from data_loading import make_splits
-from analysis import make_analysis
+# Add project root to path for imports
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
 
-THIS_PATH = os.path.dirname(os.path.realpath(__file__))
+from src.utils.data_loading import make_splits
+from src.utils.analysis import make_analysis
 
 # Download stopwords to ./nltk_data
-nltk.download("stopwords")
+nltk.download("stopwords", quiet=True)
 # Load stopwords
 stop_words = set(stopwords.words("english"))
 
@@ -88,21 +87,19 @@ class LSHIndex:
 
         sims = []
         for idx in candidates:
-            # Approx Jaccard similarity via MinHash
             sim = np.mean(self.signatures[idx] == signature)
             sims.append((sim, self.labels[idx]))
 
         sims.sort(reverse=True)
         top_sims = sims[:top_k]
 
-        # Weighted average of top k labels
         total_sim = sum(sim for sim, _ in top_sims)
         if total_sim == 0:
             avg_label = np.mean([label for _, label in top_sims])
         else:
             avg_label = sum(sim * label for sim, label in top_sims) / total_sim
 
-        return avg_label, top_sims  # return also similarity info
+        return avg_label, top_sims
 
 
 def estimate_ratings(dataset, lsh, minhash, prefix=""):
@@ -126,24 +123,24 @@ def estimate_ratings(dataset, lsh, minhash, prefix=""):
 
 if __name__ == "__main__":
     train_ds, val_ds, test_ds = make_splits(
-        os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl")
     )
     
-    # Parametri LSH
     NUM_HASHES = 180
     BANDS = 60
     
     minhash = MinHash(num_hashes=NUM_HASHES)
     lsh = LSHIndex(num_hashes=NUM_HASHES, bands=BANDS)
 
-    # --- INIZIO CACHING ---
-    cache_sig_path = os.path.join(THIS_PATH, "lsh_signatures.npy")
-    cache_rat_path = os.path.join(THIS_PATH, "lsh_ratings.npy")
+    cache_dir = os.path.join(PROJECT_ROOT, "cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    cache_sig_path = os.path.join(cache_dir, "lsh_signatures.npy")
+    cache_rat_path = os.path.join(cache_dir, "lsh_ratings.npy")
     
     signatures_data = None
     ratings_data = None
     
-    # 1. Controlliamo se esistono i file cache
     if os.path.exists(cache_sig_path) and os.path.exists(cache_rat_path):
         print(f"Trovata cache! Caricamento firme da {cache_sig_path}...")
         try:
@@ -153,7 +150,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Errore caricamento cache: {e}. Ricalcolo...")
 
-    # 2. Se non abbiamo caricato (o fallito), calcoliamo da zero
     if signatures_data is None:
         print("Calcolo firme LSH in corso (sarà lento la prima volta)...")
         sig_list = []
@@ -161,7 +157,6 @@ if __name__ == "__main__":
         
         for text, rating in tqdm(train_ds, desc="Hashing"):
             shingles = get_shingles(text)
-            # Gestione casi vuoti (importante per non disallineare gli array)
             if not shingles: 
                 continue 
                 
@@ -176,21 +171,17 @@ if __name__ == "__main__":
         np.save(cache_sig_path, signatures_data)
         np.save(cache_rat_path, ratings_data)
 
-    # 3. Popolamento Indice (Veloce)
-    # L'indice va ricostruito in RAM ogni volta, ma con i dati pronti è veloce
     print("Costruzione indice LSH...")
     num_items = len(signatures_data)
     for i in tqdm(range(num_items), desc="Populating Index"):
         lsh.add(signatures_data[i], ratings_data[i])
-    # --- FINE CACHING ---
 
-    # Ora eseguiamo i test come prima
     unknown = estimate_ratings(test_ds, lsh, minhash)
     print("Number of unknown scores:", unknown, "out of", len(test_ds))
 
-    # Test su All_Beauty (Qui non usiamo cache perché è un test rapido sul test set)
     _, _, test_ds_beauty = make_splits(
-        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty_f.jsonl")
     )
     unknown = estimate_ratings(test_ds_beauty, lsh, minhash, prefix="AllBeauty_")
     print("Number of unknown scores:", unknown, "out of", len(test_ds_beauty))
+

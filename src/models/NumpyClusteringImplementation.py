@@ -1,7 +1,6 @@
 import numpy as np
 
 
-
 ##### REMEMBER TO NORMALIZE DATASET BEFORE USING THIS CLASS FIT AND PREDICT METHODS
 class MyMiniBatchKMeans:
     def __init__(self, n_clusters=8, batch_size=256, max_iter=100, random_state=None):
@@ -65,3 +64,4 @@ class MyMiniBatchKMeans:
     def fit_predict(self, X):
         self.fit(X)
         return self.predict(X)
+
