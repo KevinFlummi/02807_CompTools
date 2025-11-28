@@ -3,9 +3,14 @@ import sys
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
-from sklearn.cluster import MiniBatchKMeans
+
+
+#### from sklearn.cluster import MiniBatchKMeans
+from NumpyClusteringImplementation import MyMiniBatchKMeans as MiniBatchKMeans
+
+
 from sklearn.preprocessing import normalize
-# from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib")
@@ -17,42 +22,65 @@ from transformer import encode_texts, build_transformer, AutoTokenizer
 THIS_PATH = os.path.dirname(os.path.realpath(__file__))
 
 
-def transformer_kmeans_clustering(dataset, k=50):
+def transformer_kmeans_clustering(dataset, k=50, cache_suffix=""):
     texts = [text for text, _ in dataset]
     ratings = np.array([rating for _, rating in dataset])
 
-    # Using pretrained sentence transformer
-    ############################################################################
-    # model = sentence_transformers.SentenceTransformer("all-MiniLM-L6-v2")
-    # embeddings = model.encode(
-    #    texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
-    # ).astype(np.float64)
-    ############################################################################
-    # Using self-trained sentence transformer
-    ############################################################################
+    # Switched to own sentence transformer implementation
+    ## Percorso dove salvare il file "cache"
+    # cache_path = os.path.join(
+    #    THIS_PATH,
+    #    f"embeddings_cache_{cache_suffix}.npy"
+    # )
+    ## Se il file esiste già, CARICALO (ci mette 1 secondo)
+    # if os.path.exists(cache_path):
+    #    print(f"Caricamento embeddings da cache: {cache_path} ...")
+    #    embeddings = np.load(cache_path)
+    #    # Carichiamo il modello solo perché serve ritornarlo, ma non calcoliamo nulla
+    #    model = SentenceTransformer("all-MiniLM-L6-v2")
+    #
+    ## Se il file NON esiste, CALCOLALO (ci mette 30 min) e poi SALVALO
+    # else:
+    #    print("Calcolo embeddings in corso (richiederà tempo)...")
+    #    model = SentenceTransformer("all-MiniLM-L6-v2")
+    #    embeddings = model.encode(
+    #        texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
+    #    ).astype(np.float64)
+    #
+    #    print(f"Salvataggio embeddings in cache: {cache_path}")
+    #    np.save(cache_path, embeddings)
     model = build_transformer()
     model.load_state_dict(torch.load("sentence_tranformer_weights.pth"))
     tokenizer = AutoTokenizer.from_pretrained("tokenizer/")
     embeddings = encode_texts(model, tokenizer, texts)
-    ############################################################################
 
     # Normalize embeddings for spherical K-Means
     embeddings = normalize(embeddings, norm="l2", axis=1)
 
-    kmeans = MiniBatchKMeans(n_clusters=k, random_state=42, batch_size=256)
+    kmeans = MiniBatchKMeans(
+        n_clusters=k, random_state=42, batch_size=3072
+    )  # batch_size=256
     clusters = kmeans.fit_predict(embeddings)
 
     cluster_ratings = {}
     cluster_stats = []
     for i in range(k):
-        # tried mean, median and max, this one seems to be the best
-        #select the ratings for each encoded vector in that particular cluster and choose the common one
-        cluster_ratings[i] = np.bincount(ratings[clusters == i].astype(int)).argmax()
-        # cluster_ratings[i] = np.median(ratings[clusters == i])
+        # Prendiamo i rating che appartengono al cluster i
+        current_cluster_ratings = ratings[clusters == i]
+
+        # Se il cluster è vuoto (nessuna recensione assegnata), mettiamo valori dummy
+        if len(current_cluster_ratings) == 0:
+            cluster_ratings[i] = 3.0  # Valore neutro di default
+            cluster_stats.append((3.0, 0.0, 3.0))
+            continue  # Passa al prossimo cluster
+
+        # Se il cluster NON è vuoto, procediamo col calcolo originale
+        cluster_ratings[i] = np.bincount(current_cluster_ratings.astype(int)).argmax()
+
         cluster_stats.append(
             (
-                np.mean(ratings[clusters == i]),
-                np.std(ratings[clusters == i]),
+                np.mean(current_cluster_ratings),
+                np.std(current_cluster_ratings),
                 cluster_ratings[i],
             )
         )
@@ -61,18 +89,13 @@ def transformer_kmeans_clustering(dataset, k=50):
 
 def transformer_clustering_predict(dataset, model, kmeans, ratings, prefix="", x=15):
     texts = [text for text, _ in dataset]
-    # Using pretrained sentence transformer
-    ############################################################################
+    # Switched to own sentence transformer implementatio
     # embeddings = model.encode(
     #    texts, show_progress_bar=True, batch_size=64, convert_to_numpy=True
     # ).astype(np.float64)
-    ############################################################################
-    # Using self-trained sentence transformer
-    ############################################################################
+    # embeddings = normalize(embeddings, norm="l2", axis=1)
     tokenizer = AutoTokenizer.from_pretrained("tokenizer/")
     embeddings = encode_texts(model, tokenizer, texts)
-    ############################################################################
-    embeddings = normalize(embeddings, norm="l2", axis=1)
 
     centers = normalize(kmeans.cluster_centers_, norm="l2", axis=1)
     dists = cdist(embeddings, centers, metric="euclidean")
@@ -102,7 +125,7 @@ if __name__ == "__main__":
 
     model, kmeans, cluster_ratings, stats = transformer_kmeans_clustering(
         train_ds,
-        k=200,  # 200 was best with pretrained
+        k=50,
     )
     plot_cluster_spread(
         stats, savepath=os.path.join(THIS_PATH, "plots", "Cluster_Distribution.png")
@@ -110,5 +133,3 @@ if __name__ == "__main__":
     transformer_clustering_predict(test_ds, model, kmeans, cluster_ratings)
 
     # MSE: 1.095 for test with k=20
-
-    print("done")
