@@ -14,8 +14,6 @@ from src.utils.data_loading import make_splits
 from src.utils.analysis import make_analysis
 from src.models.transformer import build_transformer, encode_texts
 
-THIS_PATH = os.path.dirname(os.path.realpath(__file__))
-
 
 class IndexFlatIP:
     def __init__(self, dim, normalize_vectors=False):
@@ -180,20 +178,23 @@ def estimate_ratings_with_embeddings(
 if __name__ == "__main__":
     # Load datasets
     train_ds, val_ds, test_ds = make_splits(
-        os.path.join(THIS_PATH, "datasets", "Handmade_Products_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl")
     )
 
     # Build transformer + tokenizer
     model = build_transformer()
     model.load_state_dict(
-        torch.load("sentence_tranformer_weights.pth", map_location="cpu")
+        torch.load(
+            os.path.join(PROJECT_ROOT, "sentence_tranformer_weights.pth"),
+            map_location="cpu",
+        )
     )
     model.eval()
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer/")
+    tokenizer = AutoTokenizer.from_pretrained(os.path.join(PROJECT_ROOT, "tokenizer/"))
 
     # Build IndexFlatIP embedding index
-    cache_dir = os.path.join(THIS_PATH, "cache")
+    cache_dir = os.path.join(PROJECT_ROOT, "cache")
     index = build_embedding_index(train_ds, model, tokenizer, cache_dir)
 
     # Evaluate on main test set
@@ -202,7 +203,7 @@ if __name__ == "__main__":
 
     # Evaluate on All_Beauty dataset
     _, _, test_ds_beauty = make_splits(
-        os.path.join(THIS_PATH, "datasets", "All_Beauty_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty_f.jsonl")
     )
     unknown = estimate_ratings_with_embeddings(
         test_ds_beauty, index, model, tokenizer, prefix="AllBeauty_"
