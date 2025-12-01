@@ -80,6 +80,13 @@ def transformer_kmeans_clustering(
                 cluster_ratings[i],
             )
         )
+
+    plots_dir = os.path.join(PROJECT_ROOT, "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+    plot_cluster_spread(
+        cluster_stats, savepath=os.path.join(plots_dir, "Cluster_Distribution.png")
+    )
+
     return model, kmeans, cluster_ratings, cluster_stats
 
 
@@ -134,10 +141,4 @@ if __name__ == "__main__":
         tokenizer,
         k=50,
         cache_dir=os.path.join(PROJECT_ROOT, "cache"),
-    )
-
-    plots_dir = os.path.join(PROJECT_ROOT, "plots")
-    os.makedirs(plots_dir, exist_ok=True)
-    plot_cluster_spread(
-        stats, savepath=os.path.join(plots_dir, "Cluster_Distribution.png")
     )
