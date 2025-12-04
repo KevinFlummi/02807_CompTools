@@ -6,7 +6,9 @@ import numpy as np
 from scipy.stats import norm
 from collections import defaultdict
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+)
 
 
 def mse_plot(scores, mse_values, counts, savepath=None):
@@ -84,22 +86,18 @@ def make_analysis(true_scores, pred_scores, prefix="", suffix=""):
 
     plots_dir = os.path.join(PROJECT_ROOT, "plots")
     os.makedirs(plots_dir, exist_ok=True)
-    
+
     mse_plot(
         scores,
         mse_values,
         counts,
-        savepath=os.path.join(
-            plots_dir, prefix + "ErrorPerScore_" + suffix + ".png"
-        ),
+        savepath=os.path.join(plots_dir, prefix + "ErrorPerScore_" + suffix + ".png"),
     )
 
     confusion_plot(
         true_scores,
         pred_scores,
-        savepath=os.path.join(
-            plots_dir, prefix + "ConfusionMatrix_" + suffix + ".png"
-        ),
+        savepath=os.path.join(plots_dir, prefix + "ConfusionMatrix_" + suffix + ".png"),
     )
 
 
@@ -109,8 +107,8 @@ def plot_cluster_spread(stats, savepath=None):
     colors = {1: "r", 2: "y", 3: "g", 4: "b", 5: "m"}
     for mean, std, rating in stats:
         y = norm.pdf(x, mean, std)
-        plt.plot(x, y, alpha=0.005, color=colors[rating])
-        plt.fill_between(x, y, alpha=0.01, color=colors[rating])
+        plt.plot(x, y, alpha=3 / len(stats), color=colors[rating])
+        plt.fill_between(x, y, alpha=1.5 / len(stats), color=colors[rating])
     plt.xlabel("Score")
     plt.ylabel("Certainty")
     plt.yticks([])
@@ -120,4 +118,3 @@ def plot_cluster_spread(stats, savepath=None):
         plt.savefig(savepath)
     else:
         plt.show()
-

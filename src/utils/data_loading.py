@@ -4,14 +4,17 @@ import random
 from collections import defaultdict
 from torch.utils.data import Dataset
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+)
 
 
-def filter_jsonl(input_path, output_path):
+def filter_jsonl(input_path, output_path, max_per_rating=50000):
     keep_keys = {"rating", "title", "text"}
     rating_counts_before = defaultdict(int)
     rating_counts_after = defaultdict(int)
 
+    # First pass: count existing reviews per rating
     with open(input_path, "r", encoding="utf-8") as fin:
         for line in fin:
             if not line.strip():
@@ -24,8 +27,7 @@ def filter_jsonl(input_path, output_path):
             except json.JSONDecodeError:
                 continue
 
-    max_per_rating = min(rating_counts_before.values())
-
+    # Second pass: write filtered output with limit
     with (
         open(input_path, "r", encoding="utf-8") as fin,
         open(output_path, "w", encoding="utf-8") as fout,
@@ -45,6 +47,7 @@ def filter_jsonl(input_path, output_path):
                 fout.write(json.dumps(filtered, ensure_ascii=False) + "\n")
                 rating_counts_after[rating] += 1
 
+                # stop early if all limits reached
                 if all(
                     rating_counts_after[r] >= max_per_rating for r in [1, 2, 3, 4, 5]
                 ):
@@ -53,6 +56,7 @@ def filter_jsonl(input_path, output_path):
             except json.JSONDecodeError:
                 continue
 
+    # Print results
     print(f"File: {input_path}")
     print("Rating | Before | After")
     for r in [1, 2, 3, 4, 5]:
@@ -80,7 +84,7 @@ class ReviewDataset(Dataset):
         with open(self.path, "rb") as f:
             f.seek(self.offsets[file_idx])
             line = f.readline().decode("utf-8")
-            data = json.loads(line) 
+            data = json.loads(line)
         text = f"{data.get('title', '')}: {data.get('text', '')}"
         rating = float(data.get("rating", 0.0))
         return text, rating
@@ -109,19 +113,22 @@ def make_splits(path, train_ratio=0.8, val_ratio=0.1, seed=42):
 
 if __name__ == "__main__":
     filter_jsonl(
-        os.path.join(PROJECT_ROOT, "Handmade_Products.jsonl"), 
-        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products.jsonl"),
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl"),
+        20000,
     )
     filter_jsonl(
-        os.path.join(PROJECT_ROOT, "All_Beauty.jsonl"), 
-        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty_f.jsonl")
+        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty.jsonl"),
+        os.path.join(PROJECT_ROOT, "datasets", "All_Beauty_f.jsonl"),
+        40000,
     )
 
-    train_ds, val_ds, test_ds = make_splits(os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl"))
+    train_ds, val_ds, test_ds = make_splits(
+        os.path.join(PROJECT_ROOT, "datasets", "Handmade_Products_f.jsonl")
+    )
     print("Train size:", len(train_ds))
     print("Validation size:", len(val_ds))
     print("Test size:", len(test_ds))
     print("First training sample:", train_ds[0])
 
     print("Done.")
-
